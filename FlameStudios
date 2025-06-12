@@ -1,63 +1,306 @@
--- Place this LocalScript inside a ScreenGui under StarterGui -- It includes: Speed, Jump, Fly with mobile controls, dark/light theme, draggable toggle, slide-in panel
+-- Services
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 
-local Players = game:GetService("Players") local UserInputService = game:GetService("UserInputService") local TweenService = game:GetService("TweenService") local RunService = game:GetService("RunService")
+local player = Players.LocalPlayer
+local humanoid
 
-local player = Players.LocalPlayer local character = player.Character or player.CharacterAdded:Wait() local humanoid = character:WaitForChild("Humanoid")
-
--- Theme setup local Themes = { Dark = { Background = Color3.fromRGB(30, 30, 30), Text = Color3.new(1, 1, 1), Button = Color3.fromRGB(60, 60, 60) }, Light = { Background = Color3.fromRGB(240, 240, 240), Text = Color3.new(0, 0, 0), Button = Color3.fromRGB(200, 200, 200) } } local currentTheme = "Dark"
-
--- GUI Setup local gui = Instance.new("ScreenGui") gui.Name = "FancyControllerUI" gui.ResetOnSpawn = false gui.IgnoreGuiInset = true gui.Parent = player:WaitForChild("PlayerGui")
-
-local panel = Instance.new("Frame") panel.Size = UDim2.new(0, 260, 0, 300) panel.Position = UDim2.new(0, -270, 0.4, -150) panel.BackgroundColor3 = Themes[currentTheme].Background panel.BorderSizePixel = 0 panel.ClipsDescendants = true panel.Parent = gui
-
-local uiCorner = Instance.new("UICorner", panel) uiCorner.CornerRadius = UDim.new(0, 12)
-
-local layout = Instance.new("UIListLayout") layout.Padding = UDim.new(0, 6) layout.FillDirection = Enum.FillDirection.Vertical layout.HorizontalAlignment = Enum.HorizontalAlignment.Center layout.VerticalAlignment = Enum.VerticalAlignment.Top layout.SortOrder = Enum.SortOrder.LayoutOrder layout.Parent = panel
-
-local function createButton(text, callback) local btn = Instance.new("TextButton") btn.Size = UDim2.new(0.9, 0, 0, 36) btn.BackgroundColor3 = Themes[currentTheme].Button btn.TextColor3 = Themes[currentTheme].Text btn.Font = Enum.Font.Gotham btn.TextSize = 16 btn.Text = text btn.AutoButtonColor = true btn.Parent = panel Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8) btn.MouseButton1Click:Connect(callback) return btn end
-
--- Speed/Jump Buttons createButton("Speed +5", function() humanoid.WalkSpeed = humanoid.WalkSpeed + 5 end) createButton("Speed -5", function() humanoid.WalkSpeed = math.max(0, humanoid.WalkSpeed - 5) end) createButton("Jump +10", function() humanoid.JumpPower = humanoid.JumpPower + 10 end) createButton("Jump -10", function() humanoid.JumpPower = math.max(10, humanoid.JumpPower - 10) end) createButton("Reset", function() humanoid.WalkSpeed = 16 humanoid.JumpPower = 50 end)
-
--- Fly System local flying = false local flySpeed = 50 local flyVector = Vector3.zero local flyGyro, flyVelocity
-
-local function startFly() local root = character:WaitForChild("HumanoidRootPart") flying = true
-
-flyGyro = Instance.new("BodyGyro")
-flyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
-flyGyro.CFrame = workspace.CurrentCamera.CFrame
-flyGyro.Parent = root
-
-flyVelocity = Instance.new("BodyVelocity")
-flyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
-flyVelocity.Velocity = Vector3.zero
-flyVelocity.Parent = root
-
-RunService:BindToRenderStep("Flying", Enum.RenderPriority.Input.Value, function()
-    flyGyro.CFrame = workspace.CurrentCamera.CFrame
-    flyVelocity.Velocity = flyVector * flySpeed
-end)
-
+-- Wait for humanoid and set default stats
+local function setupHumanoid(char)
+    humanoid = char:WaitForChild("Humanoid")
+    humanoid.UseJumpPower = true
+    humanoid.WalkSpeed = 16
+    humanoid.JumpPower = 50
 end
 
-local function stopFly() flying = false RunService:UnbindFromRenderStep("Flying") if flyGyro then flyGyro:Destroy() end if flyVelocity then flyVelocity:Destroy() end end
+if player.Character then
+    setupHumanoid(player.Character)
+end
+player.CharacterAdded:Connect(setupHumanoid)
 
-createButton("Toggle Fly", function() if flying then stopFly() else startFly() end end) createButton("Fly Speed +", function() flySpeed = flySpeed + 10 end) createButton("Fly Speed -", function() flySpeed = math.max(10, flySpeed - 10) end)
+-- Themes
+local Themes = {
+    Dark = {
+        Background = Color3.fromRGB(20, 20, 20),
+        Text = Color3.new(1,1,1),
+        Button = Color3.fromRGB(50, 50, 50),
+        SectionBackground = Color3.fromRGB(35, 35, 35),
+    },
+    Light = {
+        Background = Color3.fromRGB(245, 245, 245),
+        Text = Color3.new(0,0,0),
+        Button = Color3.fromRGB(220, 220, 220),
+        SectionBackground = Color3.fromRGB(235, 235, 235),
+    }
+}
+local currentTheme = "Dark"
 
--- Mobile Fly Controls local flyControlFrame = Instance.new("Frame") flyControlFrame.Size = UDim2.new(0, 160, 0, 160) flyControlFrame.Position = UDim2.new(1, -170, 1, -170) flyControlFrame.BackgroundTransparency = 1 flyControlFrame.Parent = gui
+-- Create GUI
+local gui = Instance.new("ScreenGui")
+gui.Name = "FancyControlUI"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = player:WaitForChild("PlayerGui")
 
-local directions = { {Name = "Up", Dir = Vector3.new(0, 1, 0)}, {Name = "Down", Dir = Vector3.new(0, -1, 0)}, {Name = "Forward", Dir = Vector3.new(0, 0, -1)}, {Name = "Back", Dir = Vector3.new(0, 0, 1)}, {Name = "Left", Dir = Vector3.new(-1, 0, 0)}, {Name = "Right", Dir = Vector3.new(1, 0, 0)} }
+-- Panel
+local panel = Instance.new("ScrollingFrame")
+panel.Size = UDim2.new(0.6, 0, 0.6, 0)
+panel.Position = UDim2.new(0, -300, 0.2, 0)
+panel.BackgroundColor3 = Themes[currentTheme].Background
+panel.BorderSizePixel = 0
+panel.ScrollBarThickness = 6
+panel.CanvasSize = UDim2.new(0, 0, 0, 800)
+panel.ClipsDescendants = true
+panel.Visible = false
+panel.Parent = gui
 
-for _, d in ipairs(directions) do local b = Instance.new("TextButton") b.Size = UDim2.new(0, 50, 0, 30) b.Position = UDim2.new(0, math.random(0, 110), 0, math.random(0, 110)) b.Text = d.Name b.BackgroundColor3 = Color3.fromRGB(100, 100, 100) b.TextColor3 = Color3.new(1, 1, 1) b.Font = Enum.Font.Gotham b.TextSize = 14 b.Parent = flyControlFrame b.MouseButton1Down:Connect(function() flyVector = d.Dir end) b.MouseButton1Up:Connect(function() flyVector = Vector3.zero end) end
+local panelCorner = Instance.new("UICorner")
+panelCorner.CornerRadius = UDim.new(0, 14)
+panelCorner.Parent = panel
 
--- Theme Toggle createButton("Toggle Theme", function() currentTheme = currentTheme == "Dark" and "Light" or "Dark" panel.BackgroundColor3 = Themes[currentTheme].Background for _, child in pairs(panel:GetChildren()) do if child:IsA("TextButton") then child.BackgroundColor3 = Themes[currentTheme].Button child.TextColor3 = Themes[currentTheme].Text end end end)
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 10)
+layout.FillDirection = Enum.FillDirection.Vertical
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.VerticalAlignment = Enum.VerticalAlignment.Top
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Parent = panel
 
--- Slide Toggle Button local toggle = Instance.new("TextButton") toggle.Size = UDim2.new(0, 50, 0, 50) toggle.Position = UDim2.new(0, 10, 0.5, -25) toggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70) toggle.Text = "≡" toggle.Font = Enum.Font.GothamBold toggle.TextColor3 = Color3.new(1, 1, 1) toggle.TextSize = 26 toggle.Parent = gui Instance.new("UICorner", toggle).CornerRadius = UDim.new(1, 0)
+-- Player info frame (name + avatar)
+local playerInfoFrame = Instance.new("Frame")
+playerInfoFrame.Size = UDim2.new(1, -20, 0, 70)
+playerInfoFrame.BackgroundTransparency = 1
+playerInfoFrame.Parent = panel
 
-local open = false toggle.MouseButton1Click:Connect(function() open = not open TweenService:Create(panel, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = open and UDim2.new(0, 10, 0.4, -150) or UDim2.new(0, -270, 0.4, -150) }):Play() end)
+local avatarImage = Instance.new("ImageLabel")
+avatarImage.Size = UDim2.new(0, 56, 0, 56)
+avatarImage.Position = UDim2.new(0, 10, 0, 7)
+avatarImage.BackgroundTransparency = 1
+avatarImage.Image = "rbxthumb://type=AvatarHeadShot&id="..player.UserId.."&w=48&h=48"
+avatarImage.Parent = playerInfoFrame
 
--- Draggable toggle button local dragging = false local dragInput, dragStart, startPos
+local playerNameLabel = Instance.new("TextLabel")
+playerNameLabel.Size = UDim2.new(1, -80, 0, 56)
+playerNameLabel.Position = UDim2.new(0, 72, 0, 7)
+playerNameLabel.BackgroundTransparency = 1
+playerNameLabel.Font = Enum.Font.GothamBold
+playerNameLabel.TextSize = 22
+playerNameLabel.TextColor3 = Themes[currentTheme].Text
+playerNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+playerNameLabel.Text = player.Name
+playerNameLabel.Parent = playerInfoFrame
 
-toggle.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true dragStart = input.Position startPos = toggle.Position input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end) end end)
+-- Create section
+local function createSection(title)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0.95, 0, 0, 130)
+    frame.BackgroundColor3 = Themes[currentTheme].SectionBackground
+    frame.Parent = panel
 
-UserInputService.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then local delta = input.Position - dragStart toggle.Position = UDim2.new(0, startPos.X.Offset + delta.X, 0, startPos.Y.Offset + delta.Y) end end)
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = frame
 
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -20, 0, 26)
+    label.Position = UDim2.new(0, 10, 0, 6)
+    label.BackgroundTransparency = 1
+    label.Text = title
+    label.TextColor3 = Themes[currentTheme].Text
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 17
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+
+    return frame
+end
+
+local function createSectionButton(parent, text, callback)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.9, 0, 0, 34)
+    btn.Position = UDim2.new(0.05, 0, 0, 0)
+    btn.BackgroundColor3 = Themes[currentTheme].Button
+    btn.TextColor3 = Themes[currentTheme].Text
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 15
+    btn.Text = text
+    btn.AutoButtonColor = true
+    btn.Parent = parent
+
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 8)
+    c.Parent = btn
+
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+-- Sections
+local speedSection = createSection("⚡ Speed Control")
+local jumpSection = createSection("🦘 Jump Control")
+local statsSection = createSection("📊 Your Stats")
+local themeSection = createSection("🎨 Theme & Reset")
+
+-- Speed Controls
+createSectionButton(speedSection, "+ Speed +5", function()
+    if humanoid then
+        humanoid.WalkSpeed = humanoid.WalkSpeed + 5
+    end
+end).Position = UDim2.new(0.05, 0, 0, 40)
+
+createSectionButton(speedSection, "- Speed -5", function()
+    if humanoid then
+        humanoid.WalkSpeed = math.max(0, humanoid.WalkSpeed - 5)
+    end
+end).Position = UDim2.new(0.05, 0, 0, 80)
+
+-- Jump Controls
+createSectionButton(jumpSection, "+ Jump +10", function()
+    if humanoid then
+        humanoid.UseJumpPower = true
+        humanoid.JumpPower = math.min(humanoid.JumpPower + 10, 150)
+    end
+end).Position = UDim2.new(0.05, 0, 0, 40)
+
+createSectionButton(jumpSection, "- Jump -10", function()
+    if humanoid then
+        humanoid.UseJumpPower = true
+        humanoid.JumpPower = math.max(humanoid.JumpPower - 10, 10)
+    end
+end).Position = UDim2.new(0.05, 0, 0, 80)
+
+-- Stats
+local speedStat = Instance.new("TextLabel")
+speedStat.Size = UDim2.new(0.9, 0, 0, 26)
+speedStat.Position = UDim2.new(0.05, 0, 0, 40)
+speedStat.BackgroundTransparency = 1
+speedStat.Font = Enum.Font.GothamBold
+speedStat.TextSize = 16
+speedStat.TextColor3 = Themes[currentTheme].Text
+speedStat.TextXAlignment = Enum.TextXAlignment.Left
+speedStat.Parent = statsSection
+
+local jumpStat = Instance.new("TextLabel")
+jumpStat.Size = UDim2.new(0.9, 0, 0, 26)
+jumpStat.Position = UDim2.new(0.05, 0, 0, 80)
+jumpStat.BackgroundTransparency = 1
+jumpStat.Font = Enum.Font.GothamBold
+jumpStat.TextSize = 16
+jumpStat.TextColor3 = Themes[currentTheme].Text
+jumpStat.TextXAlignment = Enum.TextXAlignment.Left
+jumpStat.Parent = statsSection
+
+spawn(function()
+    while true do
+        wait(0.2)
+        if humanoid then
+            speedStat.Text = "Speed: " .. math.floor(humanoid.WalkSpeed)
+            jumpStat.Text = "Jump Power: " .. math.floor(humanoid.JumpPower)
+        else
+            speedStat.Text = "Speed: N/A"
+            jumpStat.Text = "Jump Power: N/A"
+        end
+    end
+end)
+
+-- Theme + Reset
+createSectionButton(themeSection, "🔄 Reset Stats", function()
+    if humanoid then
+        humanoid.UseJumpPower = true
+        humanoid.WalkSpeed = 16
+        humanoid.JumpPower = 50
+    end
+end).Position = UDim2.new(0.05, 0, 0, 40)
+
+createSectionButton(themeSection, "🌙 Toggle Theme", function()
+    currentTheme = (currentTheme == "Dark") and "Light" or "Dark"
+    panel.BackgroundColor3 = Themes[currentTheme].Background
+    for _, section in pairs({speedSection, jumpSection, statsSection, themeSection}) do
+        section.BackgroundColor3 = Themes[currentTheme].SectionBackground
+        for _, child in pairs(section:GetChildren()) do
+            if child:IsA("TextButton") then
+                child.BackgroundColor3 = Themes[currentTheme].Button
+                child.TextColor3 = Themes[currentTheme].Text
+            elseif child:IsA("TextLabel") then
+                child.TextColor3 = Themes[currentTheme].Text
+            end
+        end
+    end
+    toggle.BackgroundColor3 = Themes[currentTheme].Button
+    toggle.TextColor3 = Themes[currentTheme].Text
+    playerNameLabel.TextColor3 = Themes[currentTheme].Text
+end).Position = UDim2.new(0.05, 0, 0, 80)
+
+-- Toggle button
+local toggle = Instance.new("TextButton")
+toggle.Size = UDim2.new(0, 36, 0, 36)
+toggle.Position = UDim2.new(0, 10, 0.2, 0)
+toggle.BackgroundColor3 = Themes[currentTheme].Button
+toggle.AutoButtonColor = true
+toggle.TextColor3 = Themes[currentTheme].Text
+toggle.Font = Enum.Font.GothamBold
+toggle.TextSize = 24
+toggle.Text = "≡"
+toggle.Parent = gui
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(1, 0)
+toggleCorner.Parent = toggle
+
+-- Make toggle draggable
+local dragging = false
+local dragInput, dragStart, startPos
+
+local function updateDrag(input)
+    local delta = input.Position - dragStart
+    toggle.Position = UDim2.new(
+        0,
+        math.clamp(startPos.X.Offset + delta.X, 0, workspace.CurrentCamera.ViewportSize.X - toggle.AbsoluteSize.X),
+        0,
+        math.clamp(startPos.Y.Offset + delta.Y, 0, workspace.CurrentCamera.ViewportSize.Y - toggle.AbsoluteSize.Y)
+    )
+end
+
+toggle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = toggle.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+toggle.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        updateDrag(input)
+    end
+end)
+
+local open = false
+toggle.MouseButton1Click:Connect(function()
+    open = not open
+    local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    if open then
+        panel.Visible = true
+        TweenService:Create(panel, tweenInfo, {Position = UDim2.new(0.2, 0, 0.2, 0)}):Play()
+        toggle.Text = "✕"
+    else
+        -- Slide panel fully out to left (off screen)
+        TweenService:Create(panel, tweenInfo, {Position = UDim2.new(0, -panel.AbsoluteSize.X, 0.2, 0)}):Play()
+        toggle.Text = "≡"
+        delay(0.3, function()
+            panel.Visible = false
+        end)
+    end
+end)
