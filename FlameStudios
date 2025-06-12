@@ -1,28 +1,63 @@
-local Players = game:GetService("Players") local UserInputService = game:GetService("UserInputService") local RunService = game:GetService("RunService") local TweenService = game:GetService("TweenService") local player = Players.LocalPlayer
+-- Place this LocalScript inside a ScreenGui under StarterGui -- It includes: Speed, Jump, Fly with mobile controls, dark/light theme, draggable toggle, slide-in panel
 
-local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui")) gui.Name = "UltraFancySpeedJumpFly" gui.ResetOnSpawn = false
+local Players = game:GetService("Players") local UserInputService = game:GetService("UserInputService") local TweenService = game:GetService("TweenService") local RunService = game:GetService("RunService")
 
-local themes = { Dark = { Background = Color3.fromRGB(40, 40, 50), Button = Color3.fromRGB(90, 90, 90), Text = Color3.new(1, 1, 1) }, Light = { Background = Color3.fromRGB(230, 230, 240), Button = Color3.fromRGB(180, 180, 200), Text = Color3.fromRGB(0, 0, 0) } }
+local player = Players.LocalPlayer local character = player.Character or player.CharacterAdded:Wait() local humanoid = character:WaitForChild("Humanoid")
 
-local currentTheme = "Dark"
+-- Theme setup local Themes = { Dark = { Background = Color3.fromRGB(30, 30, 30), Text = Color3.new(1, 1, 1), Button = Color3.fromRGB(60, 60, 60) }, Light = { Background = Color3.fromRGB(240, 240, 240), Text = Color3.new(0, 0, 0), Button = Color3.fromRGB(200, 200, 200) } } local currentTheme = "Dark"
 
-local container = Instance.new("Frame", gui) container.Size = UDim2.new(0, 300, 0, 360) container.Position = UDim2.new(0.5, -150, 0.5, -180) container.BackgroundColor3 = themes[currentTheme].Background container.BackgroundTransparency = 0.2 container.BorderSizePixel = 0 container.Visible = true container.ClipsDescendants = true Instance.new("UICorner", container).CornerRadius = UDim.new(0, 16) local stroke = Instance.new("UIStroke", container) stroke.Color = Color3.fromRGB(70, 70, 90) stroke.Thickness = 2 stroke.Transparency = 0.2
+-- GUI Setup local gui = Instance.new("ScreenGui") gui.Name = "FancyControllerUI" gui.ResetOnSpawn = false gui.IgnoreGuiInset = true gui.Parent = player:WaitForChild("PlayerGui")
 
-local resizeHandle = Instance.new("Frame", container) resizeHandle.Size = UDim2.new(0, 20, 0, 20) resizeHandle.Position = UDim2.new(1, -20, 1, -20) resizeHandle.BackgroundColor3 = Color3.fromRGB(100, 100, 120) resizeHandle.BackgroundTransparency = 0.5 resizeHandle.BorderSizePixel = 0 resizeHandle.ZIndex = 2 Instance.new("UICorner", resizeHandle).CornerRadius = UDim.new(1, 0)
+local panel = Instance.new("Frame") panel.Size = UDim2.new(0, 260, 0, 300) panel.Position = UDim2.new(0, -270, 0.4, -150) panel.BackgroundColor3 = Themes[currentTheme].Background panel.BorderSizePixel = 0 panel.ClipsDescendants = true panel.Parent = gui
 
-local resizing = false resizeHandle.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then resizing = true end end) UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then resizing = false end end) UserInputService.InputChanged:Connect(function(input) if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then local mousePos = input.Position local x = math.clamp(mousePos.X - container.AbsolutePosition.X, 200, 600) local y = math.clamp(mousePos.Y - container.AbsolutePosition.Y, 200, 800) container.Size = UDim2.new(0, x, 0, y) end end)
+local uiCorner = Instance.new("UICorner", panel) uiCorner.CornerRadius = UDim.new(0, 12)
 
-local title = Instance.new("TextLabel", container) title.Size = UDim2.new(1, 0, 0, 40) title.BackgroundTransparency = 1 title.Text = "⚙️ Movement Controller" title.Font = Enum.Font.GothamBold title.TextColor3 = themes[currentTheme].Text title.TextSize = 20
+local layout = Instance.new("UIListLayout") layout.Padding = UDim.new(0, 6) layout.FillDirection = Enum.FillDirection.Vertical layout.HorizontalAlignment = Enum.HorizontalAlignment.Center layout.VerticalAlignment = Enum.VerticalAlignment.Top layout.SortOrder = Enum.SortOrder.LayoutOrder layout.Parent = panel
 
-title.ZIndex = 2
+local function createButton(text, callback) local btn = Instance.new("TextButton") btn.Size = UDim2.new(0.9, 0, 0, 36) btn.BackgroundColor3 = Themes[currentTheme].Button btn.TextColor3 = Themes[currentTheme].Text btn.Font = Enum.Font.Gotham btn.TextSize = 16 btn.Text = text btn.AutoButtonColor = true btn.Parent = panel Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8) btn.MouseButton1Click:Connect(callback) return btn end
 
-local scroll = Instance.new("ScrollingFrame", container) scroll.Size = UDim2.new(1, 0, 1, -40) scroll.Position = UDim2.new(0, 0, 0, 40) scroll.CanvasSize = UDim2.new(0, 0, 0, 500) scroll.ScrollBarThickness = 4 scroll.BackgroundTransparency = 1 scroll.BorderSizePixel = 0 scroll.ZIndex = 1
+-- Speed/Jump Buttons createButton("Speed +5", function() humanoid.WalkSpeed = humanoid.WalkSpeed + 5 end) createButton("Speed -5", function() humanoid.WalkSpeed = math.max(0, humanoid.WalkSpeed - 5) end) createButton("Jump +10", function() humanoid.JumpPower = humanoid.JumpPower + 10 end) createButton("Jump -10", function() humanoid.JumpPower = math.max(10, humanoid.JumpPower - 10) end) createButton("Reset", function() humanoid.WalkSpeed = 16 humanoid.JumpPower = 50 end)
 
-local layout = Instance.new("UIListLayout", scroll) layout.Padding = UDim.new(0, 10) layout.SortOrder = Enum.SortOrder.LayoutOrder
+-- Fly System local flying = false local flySpeed = 50 local flyVector = Vector3.zero local flyGyro, flyVelocity
 
-local buttons = {}
+local function startFly() local root = character:WaitForChild("HumanoidRootPart") flying = true
 
-local dragging, offset container.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 and not resizeHandle:IsDescendantOf(input.Target) then dragging = true offset = input.Position - container.Position end end) UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end) UserInputService.InputChanged:Connect(function(input) if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then container.Position = UDim2.new(0, input.Position.X - offset.X, 0, input.Position.Y - offset.Y) end end)
+flyGyro = Instance.new("BodyGyro")
+flyGyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+flyGyro.CFrame = workspace.CurrentCamera.CFrame
+flyGyro.Parent = root
 
--- The rest of the button creation, fly logic, toggle, etc., remains unchanged. -- You can copy and paste the rest of the previously generated full script content from here.
+flyVelocity = Instance.new("BodyVelocity")
+flyVelocity.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+flyVelocity.Velocity = Vector3.zero
+flyVelocity.Parent = root
+
+RunService:BindToRenderStep("Flying", Enum.RenderPriority.Input.Value, function()
+    flyGyro.CFrame = workspace.CurrentCamera.CFrame
+    flyVelocity.Velocity = flyVector * flySpeed
+end)
+
+end
+
+local function stopFly() flying = false RunService:UnbindFromRenderStep("Flying") if flyGyro then flyGyro:Destroy() end if flyVelocity then flyVelocity:Destroy() end end
+
+createButton("Toggle Fly", function() if flying then stopFly() else startFly() end end) createButton("Fly Speed +", function() flySpeed = flySpeed + 10 end) createButton("Fly Speed -", function() flySpeed = math.max(10, flySpeed - 10) end)
+
+-- Mobile Fly Controls local flyControlFrame = Instance.new("Frame") flyControlFrame.Size = UDim2.new(0, 160, 0, 160) flyControlFrame.Position = UDim2.new(1, -170, 1, -170) flyControlFrame.BackgroundTransparency = 1 flyControlFrame.Parent = gui
+
+local directions = { {Name = "Up", Dir = Vector3.new(0, 1, 0)}, {Name = "Down", Dir = Vector3.new(0, -1, 0)}, {Name = "Forward", Dir = Vector3.new(0, 0, -1)}, {Name = "Back", Dir = Vector3.new(0, 0, 1)}, {Name = "Left", Dir = Vector3.new(-1, 0, 0)}, {Name = "Right", Dir = Vector3.new(1, 0, 0)} }
+
+for _, d in ipairs(directions) do local b = Instance.new("TextButton") b.Size = UDim2.new(0, 50, 0, 30) b.Position = UDim2.new(0, math.random(0, 110), 0, math.random(0, 110)) b.Text = d.Name b.BackgroundColor3 = Color3.fromRGB(100, 100, 100) b.TextColor3 = Color3.new(1, 1, 1) b.Font = Enum.Font.Gotham b.TextSize = 14 b.Parent = flyControlFrame b.MouseButton1Down:Connect(function() flyVector = d.Dir end) b.MouseButton1Up:Connect(function() flyVector = Vector3.zero end) end
+
+-- Theme Toggle createButton("Toggle Theme", function() currentTheme = currentTheme == "Dark" and "Light" or "Dark" panel.BackgroundColor3 = Themes[currentTheme].Background for _, child in pairs(panel:GetChildren()) do if child:IsA("TextButton") then child.BackgroundColor3 = Themes[currentTheme].Button child.TextColor3 = Themes[currentTheme].Text end end end)
+
+-- Slide Toggle Button local toggle = Instance.new("TextButton") toggle.Size = UDim2.new(0, 50, 0, 50) toggle.Position = UDim2.new(0, 10, 0.5, -25) toggle.BackgroundColor3 = Color3.fromRGB(70, 70, 70) toggle.Text = "≡" toggle.Font = Enum.Font.GothamBold toggle.TextColor3 = Color3.new(1, 1, 1) toggle.TextSize = 26 toggle.Parent = gui Instance.new("UICorner", toggle).CornerRadius = UDim.new(1, 0)
+
+local open = false toggle.MouseButton1Click:Connect(function() open = not open TweenService:Create(panel, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = open and UDim2.new(0, 10, 0.4, -150) or UDim2.new(0, -270, 0.4, -150) }):Play() end)
+
+-- Draggable toggle button local dragging = false local dragInput, dragStart, startPos
+
+toggle.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then dragging = true dragStart = input.Position startPos = toggle.Position input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end) end end)
+
+UserInputService.InputChanged:Connect(function(input) if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then local delta = input.Position - dragStart toggle.Position = UDim2.new(0, startPos.X.Offset + delta.X, 0, startPos.Y.Offset + delta.Y) end end)
 
