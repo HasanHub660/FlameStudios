@@ -1,133 +1,95 @@
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local player = Players.LocalPlayer
+local Players = game:GetService("Players") local UserInputService = game:GetService("UserInputService") local RunService = game:GetService("RunService") local TweenService = game:GetService("TweenService") local player = Players.LocalPlayer
 
--- GUI Setup
-local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-gui.Name = "UltraFancySpeedJump"
-gui.ResetOnSpawn = false
+local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui")) gui.Name = "UltraFancySpeedJumpFly" gui.ResetOnSpawn = false
 
--- Blur Background (Main Menu)
-local blur = Instance.new("Frame", gui)
-blur.Size = UDim2.new(0, 280, 0, 260)
-blur.Position = UDim2.new(0.5, -140, 0.5, -130)
-blur.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-blur.BackgroundTransparency = 0.2
-blur.BorderSizePixel = 0
-Instance.new("UICorner", blur).CornerRadius = UDim.new(0, 16)
-local stroke = Instance.new("UIStroke", blur)
-stroke.Color = Color3.fromRGB(70, 70, 90)
-stroke.Thickness = 2
-stroke.Transparency = 0.2
+local themes = { Dark = { Background = Color3.fromRGB(40, 40, 50), Button = Color3.fromRGB(90, 90, 90), Text = Color3.new(1, 1, 1) }, Light = { Background = Color3.fromRGB(230, 230, 240), Button = Color3.fromRGB(180, 180, 200), Text = Color3.fromRGB(0, 0, 0) } }
 
--- Title
-local title = Instance.new("TextLabel", blur)
-title.Size = UDim2.new(1, 0, 0, 40)
-title.BackgroundTransparency = 1
-title.Text = "⚙️ Speed & Jump Controller"
-title.Font = Enum.Font.GothamBold
-title.TextColor3 = Color3.new(1, 1, 1)
-title.TextSize = 20
+local currentTheme = "Dark"
 
--- Dragging Logic
-local dragging, offset
-blur.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = true
-		offset = input.Position - blur.Position
-	end
+local blur = Instance.new("Frame", gui) blur.Size = UDim2.new(0, 300, 0, 360) blur.Position = UDim2.new(0.5, -150, 0.5, -180) blur.BackgroundColor3 = themes[currentTheme].Background blur.BackgroundTransparency = 0.2 blur.BorderSizePixel = 0 blur.Visible = true Instance.new("UICorner", blur).CornerRadius = UDim.new(0, 16) local stroke = Instance.new("UIStroke", blur) stroke.Color = Color3.fromRGB(70, 70, 90) stroke.Thickness = 2 stroke.Transparency = 0.2
+
+local title = Instance.new("TextLabel", blur) title.Size = UDim2.new(1, 0, 0, 40) title.BackgroundTransparency = 1 title.Text = "⚙️ Movement Controller" title.Font = Enum.Font.GothamBold title.TextColor3 = themes[currentTheme].Text title.TextSize = 20
+
+local buttons = {} -- to store buttons for theme switch
+
+local dragging, offset blur.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true offset = input.Position - blur.Position end end) UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end) UserInputService.InputChanged:Connect(function(input) if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then blur.Position = UDim2.new(0, input.Position.X - offset.X, 0, input.Position.Y - offset.Y) end end)
+
+local function getHumanoid() local char = player.Character or player.CharacterAdded:Wait() local hum = char:WaitForChild("Humanoid") hum.UseJumpPower = true return hum end
+
+local function createButton(text, positionY, color, callback) local btn = Instance.new("TextButton", blur) btn.Size = UDim2.new(0.85, 0, 0, 36) btn.Position = UDim2.new(0.075, 0, 0, positionY) btn.BackgroundColor3 = color btn.Text = text btn.TextColor3 = themes[currentTheme].Text btn.Font = Enum.Font.Gotham btn.TextSize = 16 btn.AutoButtonColor = false Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10) Instance.new("UIStroke", btn).Transparency = 0.8
+
+btn.MouseEnter:Connect(function()
+	TweenService:Create(btn, TweenInfo.new(0.15), {Size = UDim2.new(0.88, 0, 0, 40)}):Play()
 end)
-UserInputService.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
-end)
-UserInputService.InputChanged:Connect(function(input)
-	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-		blur.Position = UDim2.new(0, input.Position.X - offset.X, 0, input.Position.Y - offset.Y)
-	end
+btn.MouseLeave:Connect(function()
+	TweenService:Create(btn, TweenInfo.new(0.15), {Size = UDim2.new(0.85, 0, 0, 36)}):Play()
 end)
 
--- Get Humanoid
-local function getHumanoid()
-	local char = player.Character or player.CharacterAdded:Wait()
-	local hum = char:WaitForChild("Humanoid")
-	hum.UseJumpPower = true
-	return hum
+btn.MouseButton1Click:Connect(function()
+	callback(btn)
+end)
+
+table.insert(buttons, btn)
+
 end
 
--- Button Builder
-local function createButton(text, positionY, color, callback)
-	local btn = Instance.new("TextButton", blur)
-	btn.Size = UDim2.new(0.85, 0, 0, 36)
-	btn.Position = UDim2.new(0.075, 0, 0, positionY)
-	btn.BackgroundColor3 = color
-	btn.Text = text
-	btn.TextColor3 = Color3.new(1, 1, 1)
-	btn.Font = Enum.Font.Gotham
-	btn.TextSize = 16
-	btn.AutoButtonColor = false
+createButton("➕ Speed +5", 50, Color3.fromRGB(65, 130, 200), function() getHumanoid().WalkSpeed += 5 end)
 
-	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
-	local stroke = Instance.new("UIStroke", btn)
-	stroke.Thickness = 1
-	stroke.Color = Color3.fromRGB(255, 255, 255)
-	stroke.Transparency = 0.8
+createButton("➖ Speed -5", 95, Color3.fromRGB(90, 90, 90), function() getHumanoid().WalkSpeed = math.max(0, getHumanoid().WalkSpeed - 5) end)
 
-	btn.MouseEnter:Connect(function()
-		btn.BackgroundColor3 = color:lerp(Color3.new(1, 1, 1), 0.1)
-	end)
-	btn.MouseLeave:Connect(function()
-		btn.BackgroundColor3 = color
-	end)
+createButton("🔼 Jump +10", 140, Color3.fromRGB(60, 180, 100), function() getHumanoid().JumpPower += 10 end)
 
-	btn.MouseButton1Click:Connect(callback)
+createButton("🔁 Reset All", 185, Color3.fromRGB(200, 50, 50), function() local hum = getHumanoid() hum.WalkSpeed = 16 hum.JumpPower = 50 flySpeed = 50 flying = false end)
+
+local flySpeed = 50 local flying = false local keys = {W = false, A = false, S = false, D = false, Space = false, LeftControl = false}
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed) if gameProcessed then return end if input.KeyCode.Name then keys[input.KeyCode.Name] = true end end) UserInputService.InputEnded:Connect(function(input) if input.KeyCode.Name then keys[input.KeyCode.Name] = false end end)
+
+local function startFlying() local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") if not root then return end
+
+local bv = Instance.new("BodyVelocity", root)
+bv.Name = "FlyVelocity"
+bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+
+local bg = Instance.new("BodyGyro", root)
+bg.Name = "FlyGyro"
+bg.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+bg.CFrame = root.CFrame
+
+RunService.Heartbeat:Connect(function()
+	if not flying or not root or not root.Parent then
+		bv:Destroy()
+		bg:Destroy()
+		return
+	end
+	local cam = workspace.CurrentCamera
+	local dir = Vector3.zero
+	if keys.W then dir += cam.CFrame.LookVector end
+	if keys.S then dir -= cam.CFrame.LookVector end
+	if keys.A then dir -= cam.CFrame.RightVector end
+	if keys.D then dir += cam.CFrame.RightVector end
+	if keys.Space then dir += Vector3.yAxis end
+	if keys.LeftControl then dir -= Vector3.yAxis end
+	bv.Velocity = dir.Magnitude > 0 and dir.Unit * flySpeed or Vector3.zero
+	bg.CFrame = cam.CFrame
+end)
+
 end
 
--- Control Buttons
-createButton("➕ Speed +5", 50, Color3.fromRGB(65, 130, 200), function()
-	local hum = getHumanoid()
-	hum.WalkSpeed += 5
-end)
+createButton("🕊️ Toggle Fly", 230, Color3.fromRGB(100, 80, 200), function(btn) flying = not flying btn.BackgroundColor3 = flying and Color3.fromRGB(150, 100, 250) or Color3.fromRGB(100, 80, 200) if flying then startFlying() else local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") if root then local bv = root:FindFirstChild("FlyVelocity") local bg = root:FindFirstChild("FlyGyro") if bv then bv:Destroy() end if bg then bg:Destroy() end end end end)
 
-createButton("➖ Speed -5", 95, Color3.fromRGB(90, 90, 90), function()
-	local hum = getHumanoid()
-	hum.WalkSpeed = math.max(0, hum.WalkSpeed - 5)
-end)
+createButton("➕ Fly Speed +5", 270, Color3.fromRGB(120, 120, 230), function() flySpeed += 5 end)
 
-createButton("🔼 Jump +10", 140, Color3.fromRGB(60, 180, 100), function()
-	local hum = getHumanoid()
-	hum.JumpPower += 10
-end)
+createButton("➖ Fly Speed -5", 310, Color3.fromRGB(70, 70, 150), function() flySpeed = math.max(0, flySpeed - 5) end)
 
-createButton("🔁 Reset All", 185, Color3.fromRGB(200, 50, 50), function()
-	local hum = getHumanoid()
-	hum.WalkSpeed = 16
-	hum.JumpPower = 50
-end)
+createButton("🌗 Toggle Theme", 350, Color3.fromRGB(80, 80, 80), function() currentTheme = currentTheme == "Dark" and "Light" or "Dark" blur.BackgroundColor3 = themes[currentTheme].Background title.TextColor3 = themes[currentTheme].Text for _, btn in pairs(buttons) do btn.TextColor3 = themes[currentTheme].Text end end)
 
--- Toggle Button
-local toggleBtn = Instance.new("TextButton", gui)
-toggleBtn.Size = UDim2.new(0, 40, 0, 40)
-toggleBtn.Position = UDim2.new(0, 10, 0, 10)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-toggleBtn.Text = "⚙️"
-toggleBtn.Font = Enum.Font.GothamBold
-toggleBtn.TextSize = 22
-toggleBtn.TextColor3 = Color3.new(1, 1, 1)
-toggleBtn.AutoButtonColor = false
-toggleBtn.ZIndex = 10
-Instance.new("UICorner", toggleBtn)
+local toggleBtn = Instance.new("TextButton", gui) toggleBtn.Size = UDim2.new(0, 40, 0, 40) toggleBtn.Position = UDim2.new(0, 10, 0, 10) toggleBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45) toggleBtn.Text = "⚙️" toggleBtn.Font = Enum.Font.GothamBold toggleBtn.TextSize = 22 toggleBtn.TextColor3 = Color3.new(1, 1, 1) toggleBtn.AutoButtonColor = false Instance.new("UICorner", toggleBtn)
 
--- Hover effect
-toggleBtn.MouseEnter:Connect(function()
-	toggleBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
-end)
-toggleBtn.MouseLeave:Connect(function()
-	toggleBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-end)
+local visible = true blur.BackgroundTransparency = 0.2
 
--- Toggle visibility
-local visible = true
-toggleBtn.MouseButton1Click:Connect(function()
-	visible = not visible
-	blur.Visible = visible
-end)
+local function animateToggle(show) if show then blur.Visible = true TweenService:Create(blur, TweenInfo.new(0.3), { BackgroundTransparency = 0.2, Position = UDim2.new(0.5, -150, 0.5, -180) }):Play() else local tween = TweenService:Create(blur, TweenInfo.new(0.3), { BackgroundTransparency = 1, Position = UDim2.new(0.5, -150, 0.5, -200) }) tween:Play() tween.Completed:Connect(function() if not visible then blur.Visible = false end end) end end
+
+toggleBtn.MouseButton1Click:Connect(function() visible = not visible animateToggle(visible) end)
+
+
