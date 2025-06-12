@@ -35,6 +35,17 @@ local Themes = {
 }
 local currentTheme = "Dark"
 
+-- Welcome messages
+local welcomeMessages = {
+    "Welcome back,",
+    "Good to see you,",
+    "Hello again,",
+    "You're looking sharp,",
+    "Ready to play,",
+    "Let’s do this,"
+}
+local selectedMessage = welcomeMessages[math.random(1, #welcomeMessages)]
+
 -- Create GUI
 local gui = Instance.new("ScreenGui")
 gui.Name = "FancyControlUI"
@@ -66,7 +77,7 @@ layout.VerticalAlignment = Enum.VerticalAlignment.Top
 layout.SortOrder = Enum.SortOrder.LayoutOrder
 layout.Parent = panel
 
--- Player info frame (name + avatar)
+-- Player info frame (name + avatar + welcome)
 local playerInfoFrame = Instance.new("Frame")
 playerInfoFrame.Size = UDim2.new(1, -20, 0, 70)
 playerInfoFrame.BackgroundTransparency = 1
@@ -76,21 +87,25 @@ local avatarImage = Instance.new("ImageLabel")
 avatarImage.Size = UDim2.new(0, 56, 0, 56)
 avatarImage.Position = UDim2.new(0, 10, 0, 7)
 avatarImage.BackgroundTransparency = 1
-avatarImage.Image = "rbxthumb://type=AvatarHeadShot&id="..player.UserId.."&w=48&h=48"
+avatarImage.Image = "rbxthumb://type=AvatarHeadShot&id="..player.UserId.."&w=420&h=420"
 avatarImage.Parent = playerInfoFrame
 
 local playerNameLabel = Instance.new("TextLabel")
-playerNameLabel.Size = UDim2.new(1, -80, 0, 56)
-playerNameLabel.Position = UDim2.new(0, 72, 0, 7)
+playerNameLabel.Size = UDim2.new(1, -80, 0, 28)
+playerNameLabel.Position = UDim2.new(0, 72, 0, 6)
 playerNameLabel.BackgroundTransparency = 1
 playerNameLabel.Font = Enum.Font.GothamBold
-playerNameLabel.TextSize = 22
+playerNameLabel.TextSize = 18
 playerNameLabel.TextColor3 = Themes[currentTheme].Text
 playerNameLabel.TextXAlignment = Enum.TextXAlignment.Left
-playerNameLabel.Text = player.Name
+playerNameLabel.Text = selectedMessage .. " " .. player.Name .. "!"
 playerNameLabel.Parent = playerInfoFrame
 
--- Create section
+-- Animate welcome message fade-in
+playerNameLabel.TextTransparency = 1
+TweenService:Create(playerNameLabel, TweenInfo.new(0.6), {TextTransparency = 0}):Play()
+
+-- Section creation
 local function createSection(title)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0.95, 0, 0, 130)
@@ -144,7 +159,7 @@ local themeSection = createSection("🎨 Theme & Reset")
 -- Speed Controls
 createSectionButton(speedSection, "+ Speed +5", function()
     if humanoid then
-        humanoid.WalkSpeed = humanoid.WalkSpeed + 5
+        humanoid.WalkSpeed += 5
     end
 end).Position = UDim2.new(0.05, 0, 0, 40)
 
@@ -157,14 +172,12 @@ end).Position = UDim2.new(0.05, 0, 0, 80)
 -- Jump Controls
 createSectionButton(jumpSection, "+ Jump +10", function()
     if humanoid then
-        humanoid.UseJumpPower = true
         humanoid.JumpPower = math.min(humanoid.JumpPower + 10, 150)
     end
 end).Position = UDim2.new(0.05, 0, 0, 40)
 
 createSectionButton(jumpSection, "- Jump -10", function()
     if humanoid then
-        humanoid.UseJumpPower = true
         humanoid.JumpPower = math.max(humanoid.JumpPower - 10, 10)
     end
 end).Position = UDim2.new(0.05, 0, 0, 80)
@@ -190,15 +203,12 @@ jumpStat.TextColor3 = Themes[currentTheme].Text
 jumpStat.TextXAlignment = Enum.TextXAlignment.Left
 jumpStat.Parent = statsSection
 
-spawn(function()
+task.spawn(function()
     while true do
-        wait(0.2)
+        task.wait(0.2)
         if humanoid then
             speedStat.Text = "Speed: " .. math.floor(humanoid.WalkSpeed)
             jumpStat.Text = "Jump Power: " .. math.floor(humanoid.JumpPower)
-        else
-            speedStat.Text = "Speed: N/A"
-            jumpStat.Text = "Jump Power: N/A"
         end
     end
 end)
@@ -206,37 +216,35 @@ end)
 -- Theme + Reset
 createSectionButton(themeSection, "🔄 Reset Stats", function()
     if humanoid then
-        humanoid.UseJumpPower = true
         humanoid.WalkSpeed = 16
         humanoid.JumpPower = 50
     end
 end).Position = UDim2.new(0.05, 0, 0, 40)
 
 createSectionButton(themeSection, "🌙 Toggle Theme", function()
-    currentTheme = (currentTheme == "Dark") and "Light" or "Dark"
+    currentTheme = currentTheme == "Dark" and "Light" or "Dark"
     panel.BackgroundColor3 = Themes[currentTheme].Background
-    for _, section in pairs({speedSection, jumpSection, statsSection, themeSection}) do
+    for _, section in {speedSection, jumpSection, statsSection, themeSection} do
         section.BackgroundColor3 = Themes[currentTheme].SectionBackground
         for _, child in pairs(section:GetChildren()) do
-            if child:IsA("TextButton") then
-                child.BackgroundColor3 = Themes[currentTheme].Button
+            if child:IsA("TextLabel") then
                 child.TextColor3 = Themes[currentTheme].Text
-            elseif child:IsA("TextLabel") then
+            elseif child:IsA("TextButton") then
+                child.BackgroundColor3 = Themes[currentTheme].Button
                 child.TextColor3 = Themes[currentTheme].Text
             end
         end
     end
+    playerNameLabel.TextColor3 = Themes[currentTheme].Text
     toggle.BackgroundColor3 = Themes[currentTheme].Button
     toggle.TextColor3 = Themes[currentTheme].Text
-    playerNameLabel.TextColor3 = Themes[currentTheme].Text
 end).Position = UDim2.new(0.05, 0, 0, 80)
 
--- Toggle button
+-- Toggle Button
 local toggle = Instance.new("TextButton")
 toggle.Size = UDim2.new(0, 36, 0, 36)
 toggle.Position = UDim2.new(0, 10, 0.2, 0)
 toggle.BackgroundColor3 = Themes[currentTheme].Button
-toggle.AutoButtonColor = true
 toggle.TextColor3 = Themes[currentTheme].Text
 toggle.Font = Enum.Font.GothamBold
 toggle.TextSize = 24
@@ -266,7 +274,6 @@ toggle.InputBegan:Connect(function(input)
         dragging = true
         dragStart = input.Position
         startPos = toggle.Position
-
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
                 dragging = false
@@ -287,20 +294,20 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
     end
 end)
 
+-- Toggle show/hide panel
 local open = false
 toggle.MouseButton1Click:Connect(function()
     open = not open
-    local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tweenInfo = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
     if open then
         panel.Visible = true
         TweenService:Create(panel, tweenInfo, {Position = UDim2.new(0.2, 0, 0.2, 0)}):Play()
         toggle.Text = "✕"
     else
-        -- Slide panel fully out to left (off screen)
         TweenService:Create(panel, tweenInfo, {Position = UDim2.new(0, -panel.AbsoluteSize.X, 0.2, 0)}):Play()
-        toggle.Text = "≡"
-        delay(0.3, function()
+        task.delay(0.35, function()
             panel.Visible = false
         end)
+        toggle.Text = "≡"
     end
 end)
